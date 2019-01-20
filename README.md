@@ -28,7 +28,7 @@ from txjsonrpcqueue import TxJsonRpcClient as JsonRpcClient
 #to specify "condenser_api"as default namespace for use with STEEM.
 #If you wish to use this library with a JSON-RPC server that does support batches but does not 
 #use a namespaced API, you can leave defaultns defined as its default of None. 
-wq = WildcardQueue(low=8000, high=10000, defaultns="condenser_api")
+wq = WildcardQueue(low=8000, high=10000, namespace="condenser_api")
 
 #Now that we have a queue, we can define our core JSON-RPC client that will get fed by the queue.
 client = JsonRpcClient(nodes=["api.steemitstage.com"],queue=wq)
