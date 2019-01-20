@@ -16,8 +16,10 @@ The 1.0 version of this library is intended to run:
     * With asyncio on Python 3.6
 
 """
-
-import queue
+#Import twisted, asyncio or both. At least one of the two should successfully import.
+#Set variables that indicate if imports succeeded.
+HAS_TWISTED = False
+HAS_ASYNCIO = False
 try:
     from twisted.internet import task
     from twisted.internet import reactor
@@ -35,9 +37,10 @@ except ImportError:
     except ImportError:
         raise ImportError("Missing event loop framework (either Twisted or asyncio will do")
 
+
 class _AioFutureWrapper(object):
     #pylint: disable=too-few-public-methods
-    """Simple wrapper for giving Future a Deferred compatible callback"""
+    """Simple wrapper for wrapping a Future with an object that has a 'callback' method"""
     def __init__(self, future):
         self.future = future
     def callback(self, value):
@@ -55,6 +58,46 @@ class _TxSoon(object):
     def __call__(self, callback, argument):
         task.deferLater(reactor, 0.0, callback, argument)
 
+def _aio_set_future(dct):
+    dct["future"] = asyncio.Future()
+
+def _tx_set_deferred(dct):
+    dct["deferred"] = defer.Deferred()
+
+def _aio_set_error(dct, err):
+    dct["future"].set_exception(err)
+
+def _tx_set_error(dct, err):
+    dct["deferred"].errback(err)
+
+class _WildcardMethod(object):
+    def __init__(self, outername, outer, set_future_or_deferred, set_error_on_future_or_deferred):
+        self.outername = outername
+        self.outer = outer
+        self.set_future_or_deferred = set_future_or_deferred
+        self.set_error_on_future_or_deferred = set_error_on_future_or_deferred
+    def __getattr__(self, innername):
+        def _core(*args, **kwargs):
+            ttask = dict()
+            if self.outername:
+                ttask["method"] = self.outername + "." + innername
+            else:
+                ttask["method"] = innername
+            if kwargs:
+                ttask["params"] = kwargs
+            else:
+                ttask["params"] = list(args)
+            self.set_future_or_deferred(ttask)
+            ok = self.outer.core.put(ttask)
+            if not ok:
+                self.set_error_on_future_or_deferred(ttask, 
+                    BufferError("No more room left in WildcardQueue"))
+            return ttask["deferred"]
+        return _core
+    def __call__(self, *args, **kwargs):
+        return self.outer.__getattr__(
+            self.outer.namespace).__getattr__(self.outername)(*args, **kwargs)
+
 class AioWildcardQueue(object):
     # pylint: disable=too-few-public-methods
     """Asyncio based hysteresis queue wrapper"""
@@ -70,32 +113,7 @@ class AioWildcardQueue(object):
         self.core.get(_AioFutureWrapper(f), maxbatch)
         return f
     def __getattr__(self, outername):
-        class _inner(object):
-            def __init__(self, outer):
-                self.outer = outer
-            def __getattr__(self, innername):
-                def _core(*args, **kwargs):
-                    ttask = dict()
-                    if outername:
-                        ttask["method"] = innername
-                    else:
-                        ttask["method"] = innername
-                    if kwargs:
-                        ttask["params"] = kwargs
-                    else:
-                        ttask["params"] = list(args)
-                    ttask["future"] = asyncio.Future()
-                    ok = self.outer.core.put(task)
-                    if not ok:
-                        ttask["future"].set_exception(BufferError(\
-                                "No more room left in WildcardQueue"))
-                    return ttask["future"]
-                return _core
-            def __call__(self, *args, **kwargs):
-                return self.outer.__getattr__(
-                    self.outer.namespace).__getattr__(outername)(*args, **kwargs)
-        inner = _inner(self)
-        return inner
+        return _WildcardMethod(outername, self, _aio_set_future, _aio_set_error)
 
 class TxWildcardQueue(object):
     # pylint: disable=too-few-public-methods
@@ -112,33 +130,7 @@ class TxWildcardQueue(object):
         self.core.get(d, maxbatch)
         return d
     def __getattr__(self, outername):
-        class _inner(object):
-            def __init__(self, outer):
-                self.outer = outer
-            def __getattr__(self, innername):
-                def _core(*args, **kwargs):
-                    ttask = dict()
-                    if outername:
-                        ttask["method"] = outername + "." + innername
-                    else:
-                        ttask["method"] = innername
-                    if kwargs:
-                        ttask["params"] = kwargs
-                    else:
-                        ttask["params"] = list(args)
-                    ttask["deferred"] = defer.Deferred()
-                    ok = self.outer.core.put(ttask)
-                    if not ok:
-                        ttask["deferred"].errback(BufferError("No more room left in WildcardQueue"))
-                    return ttask["deferred"]
-                return _core
-            def __call__(self, *args, **kwargs):
-                return self.outer.__getattr__(
-                    self.outer.namespace).__getattr__(outername)(*args, **kwargs)
-        inner = _inner(self)
-        return inner
-
-
+        return _WildcardMethod(outername, self, _tx_set_deferred, _tx_set_error)
 
 class _CoreWildcardQueue(object):
     """Simple Twisted based hysteresis queue"""
@@ -149,8 +141,8 @@ class _CoreWildcardQueue(object):
         self.active = True
         self.highwater = highwater
         self.lowwater = lowwater
-        self.msg_queue = queue.Queue()
-        self.fetch_msg_queue = queue.Queue()
+        self.msg_queue = list()
+        self.fetch_msg_queue = list()
         self.dropcount = 0
         self.okcount = 0
     def put(self, entry):
@@ -163,8 +155,8 @@ class _CoreWildcardQueue(object):
         self.okcount += 1
         try:
             #See if there is a callback waiting already
-            d = self.fetch_msg_queue.get(block=False)
-        except queue.Empty:
+            d = self.fetch_msg_queue.pop(0)
+        except IndexError:
             d = None
         if d:
             #If there is a callback waiting schedule for it to be called on
@@ -173,8 +165,8 @@ class _CoreWildcardQueue(object):
             return True
         else:
             #If no callback is waiting, add entry to the queue
-            self.msg_queue.put(entry)
-            if self.msg_queue.qsize() >= self.high:
+            self.msg_queue.append(entry)
+            if len(self.msg_queue) >= self.high:
                 # Queue is full now (high watermark, disable adding untill empty.
                 self.active = False
                 #Call handler of high/low watermark events on earliest opportunity
@@ -189,14 +181,14 @@ class _CoreWildcardQueue(object):
         while rval and len(rbatch) < maxbatch:
             try:
                 #See if we can fetch a value from the queue right now.
-                rval = self.msg_queue.get(block=False)
+                rval = self.msg_queue.pop(0)
                 rbatch.append(rval)
-            except queue.Empty:
+            except IndexError:
                 rval = None
         if rbatch:
             #If we can, call callback at earliest opportunity
             self.soon(d.callback, rbatch)
-            if self.active is False and self.msg_queue.qsize() <= self.low:
+            if self.active is False and len(self.msg_queue) <= self.low:
                 #If adding to the queue was disabled and we just dropped below the low water mark,
                 # re-enable the queue now.
                 self.active = True
@@ -205,4 +197,4 @@ class _CoreWildcardQueue(object):
                 self.dropcount = 0
         else:
             # If the queue was empty, add our callback to the callback queue
-            self.fetch_msg_queue.put(d.callback)
+            self.fetch_msg_queue.append(d.callback)
