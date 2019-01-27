@@ -1,18 +1,20 @@
 # txjsonrpcqueue : Asynchonous (Twisted or asyncio) Python library for batched JSON-RPC
 
 The txjsonrpcqueue library currently is in early stages of development. The goal is to do
-a rewrite of the functionality of the asyncsteem library and the asyncsteem3 library in a 
-set of seperate smaller libraries. This library implementing the low level asynchronous 
-JSON-RPC functionality. A second library for streaming new or old blocks, and a third library
-implementing signed operations. The goal is to make all three libraries work across python 
-versions and across event frameworks.
+a rewrite of the functionality of the [asyncsteem](https://github.com/pibara-utopian/asyncsteem) 
+library and the asyncsteem3 library in a more modular and more portable way. 
+
+The core library will be implementing just the low level asynchronous JSON-RPC functionality 
+in a non STEEM specific way with blockchain (STEEM to start with) code in its own sub library. 
+
+The goal of the rewrite is to make this library work across python versions and across event 
+frameworks, and eventually across different JSON-RPC supporting blockchains.
+
+The target Python versions and async frameworks are:
 
 * Python >= 2.6 with Twisted
 * Python >= 3.3 with Twisted
 * Python >= 3.6 with asyncio
-
-While support of the STEEM APPBASE API is a prime support, the goal for txjsonrpcqueue, other 
-than the other two libraries is to be usable outside of the context of STEEM APPBASE.
 
 ```python
 #Import WildcardQueue and JsonRpcClient in their Twisted variant. 
