@@ -17,18 +17,23 @@ The 1.0 version of this library is intended to run:
 
 """
 from txjsonrpcqueue.corewildcardqueue import WildcardMethod, CoreWildcardQueue
-from txjsonrpcqueue.aiowildcardqueue import AioWildcardQueue, AioRpcForwarder #REMOVE THIS LINE
 #Import twisted, asyncio or both. At least one of the two should successfully import.
 try:
     from txjsonrpcqueue.txwildcardqueue import TxWildcardQueue
     try:
-        from txjsonrpcqueue.aiowildcardqueue import AioWildcardQueue, AioRpcForwarder
+        from txjsonrpcqueue.aiowildcardqueue import AioWildcardQueue
+        try:
+            from txjsonrpcqueue.aiorpcforwarder import AioRpcForwarder
+        except ImportError:
+            pass
     except ImportError:
-        print("WARNING: AioWildcardQueue not imported")
         pass
 except ImportError:
-    print("WARNING: TxWildcardQueue not imported")
     try:
         from txjsonrpcqueue.aiowildcardqueue import AioWildcardQueue, AioRpcForwarder
+        try:
+            from txjsonrpcqueue.aiorpcforwarder import AioRpcForwarder
+        except ImportError:
+            pass
     except ImportError:
         raise ImportError("Missing event loop framework (either Twisted or asyncio will do")

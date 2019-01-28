@@ -27,8 +27,7 @@ class WildcardMethod(object):
                                                          "No more room left in WildcardQueue"))
             if "deferred" in ttask:
                 return ttask["deferred"]
-            else:
-                return ttask["future"]
+            return ttask["future"]
         return _core
     def __call__(self, *args, **kwargs):
         return self.outer.__getattr__(

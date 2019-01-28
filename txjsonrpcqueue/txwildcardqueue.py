@@ -24,7 +24,7 @@ class TxWildcardQueue(object):
         #pylint: disable=too-many-arguments
         self.namespace = namespace
         self.core = CoreWildcardQueue(_TxSoon(), low, high, highwater, lowwater)
-    def _get(self, maxbatch=20):
+    def json_rpcqueue__get(self, maxbatch=20):
         """Fetch an entry from the queue, imediately if possible,
            or remember callback for when an entry becomes available."""
         deferred_get = defer.Deferred()
