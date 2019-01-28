@@ -65,7 +65,7 @@ class CoreWildcardQueue(object):
         if deferred_get:
             #If there is a callback waiting schedule for it to be called on
             # the earliest opportunity
-            self.soon(deferred_get.callback, entry)
+            self.soon(deferred_get.callback, [entry])
             return True
         else:
             #If no callback is waiting, add entry to the queue
@@ -101,4 +101,4 @@ class CoreWildcardQueue(object):
                 self.dropcount = 0
         else:
             # If the queue was empty, add our callback to the callback queue
-            self.fetch_msg_queue.append(deferred_get.callback)
+            self.fetch_msg_queue.append(deferred_get)
