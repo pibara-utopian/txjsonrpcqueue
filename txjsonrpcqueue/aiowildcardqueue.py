@@ -73,6 +73,14 @@ class AioRpcForwarder(object):
             def process_response(response):
                 def process_batch_level_exception(exception):
                     print(exception)
+                def close_session(session):
+                    def on_closed(result):
+                        try:
+                            result.result()
+                        except Exception as e:
+                            print("Problem closing:",e)
+                    close_future = asyncio.ensure_future(session.close())
+                    close_future.add_done_callback(on_closed)
                 def process_text(text_result):
                     def process_response_json(resp_json):
                         try:
@@ -107,6 +115,7 @@ class AioRpcForwarder(object):
                         process_response_json(text)
                     except Exception as e:
                         process_batch_level_exception(e)
+                    close_session(session)
                     self._fetch_batch()
                 try:
                     result = response.result()
@@ -114,6 +123,7 @@ class AioRpcForwarder(object):
                     txt.add_done_callback(process_text)
                 except Exception as e:
                     process_batch_level_exception(e)
+                    close_session(session)
                     self._fetch_batch()
 
             batch_in=batch_fut.result()
