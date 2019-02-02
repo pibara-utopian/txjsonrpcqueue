@@ -13,6 +13,7 @@ def process_result(result):
         print("OOPS:",e)
 
 wq = WildcardQueue(low=8000, high=10000, namespace="condenser_api")
+print(type(wq))
 fw = RpcForwarder(queue=wq, host_url="https://api.steemit.com")
 for index in range(12345670,12345679):
     f1 = wq.get_block(index)

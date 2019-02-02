@@ -3,3 +3,4 @@
 """
 from txjsonrpcqueue.wildcardqueue import WildcardQueue
 from txjsonrpcqueue.rpcforwarder import RpcForwarder
+from txjsonrpcqueue.exception import HttpError, HttpServerError, HttpClientError, JsonRpcBatchError, JsonRpcCommandError, JsonRpcCommandResponseError

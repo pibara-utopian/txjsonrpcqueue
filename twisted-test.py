@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from twisted.internet import reactor
-from txjsonrpcqueue import WildcardQueue, RpcForwarder
+from txjsonrpcqueue import WildcardQueue, RpcForwarder, ef
 
 def process_result(res):
     print("#########################################################")
