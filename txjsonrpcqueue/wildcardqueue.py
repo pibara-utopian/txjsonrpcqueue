@@ -3,7 +3,7 @@
 from twisted.internet import task
 from twisted.internet import reactor
 from twisted.internet import defer
-from txjsonrpcqueue.corewildcardqueue import WildcardMethod, CoreWildcardQueue
+from txjsonrpcqueue.core.wildcardqueue import WildcardMethod, CoreWildcardQueue
 
 class _TxSoon(object):
     """Helper class for making core hysteresis queue event framework agnostic"""
@@ -17,14 +17,14 @@ def _tx_set_deferred(dct):
 def _tx_set_error(dct, err):
     dct["deferred"].errback(err)
 
-class TxWildcardQueue(object):
+class WildcardQueue(object):
     # pylint: disable=too-few-public-methods
     """Twisted based hysteresis queue wrapper"""
     def __init__(self, low=8000, high=10000, highwater=None, lowwater=None, namespace=None):
         #pylint: disable=too-many-arguments
         self.namespace = namespace
         self.core = CoreWildcardQueue(_TxSoon(), low, high, highwater, lowwater)
-    def json_rpcqueue__get(self, maxbatch=20):
+    def json_rpcqueue_get(self, maxbatch=20):
         """Fetch an entry from the queue, imediately if possible,
            or remember callback for when an entry becomes available."""
         deferred_get = defer.Deferred()

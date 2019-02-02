@@ -24,7 +24,7 @@ class _StringProducer(object):
         """dummy stopProducing, does nothing"""
         pass
 
-class TxRpcForwarder:
+class RpcForwarder:
     # pylint: disable=too-few-public-methods
     def __init__(self, queue, host_injector=None, host_url=None):
         if host_injector is None and host_url is None:
@@ -41,7 +41,10 @@ class TxRpcForwarder:
             host_injector.register_forwarder(self)
         else:
             #Set our static host url and start processing batches imediately.
-            self.host_url = host_url
+            if isinstance(host_url, str):
+                self.host_url = host_url.encode("utf8")
+            else:
+                self.host_url = host_url
             self._fetch_batch()
     def inject_host_url(self, url):
         #Set the host url to its new value
@@ -130,14 +133,14 @@ class TxRpcForwarder:
             batch_out.append(newcmd)
         #Post the JSON-RPC batch request to the server and wait for response
         deferred_response = self.agent.request(
-            'POST',
+            b'POST',
             self.host_url,
-            Headers({"User-Agent"  : ['TxJsonRpcQueue v0.0.1'],
-                     "Content-Type": ["application/json"]}),
-            _StringProducer(json.dumps(batch_out)))
+            Headers({b"User-Agent"  : [b'TxJsonRpcQueue v0.0.1'],
+                     b"Content-Type": [b"application/json"]}),
+            _StringProducer(json.dumps(batch_out).encode("utf8")))
         deferred_response.addCallback(process_response)
         deferred_response.addErrback(process_batch_level_exception)
     def _fetch_batch(self):
         #Notify the queue that we are ready to receive a batch.
         batch_deferred = self.queue.json_rpcqueue_get()
-        batch_deferred.add_done_callback(self._process_batch)
+        batch_deferred.addCallback(self._process_batch)

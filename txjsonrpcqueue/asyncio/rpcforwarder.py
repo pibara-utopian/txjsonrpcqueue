@@ -4,7 +4,7 @@ import json
 import asyncio
 import aiohttp
 
-class AioRpcForwarder:
+class RpcForwarder:
     # pylint: disable=too-few-public-methods
     def __init__(self, queue, host_injector=None, host_url=None):
         if host_injector is None and host_url is None:

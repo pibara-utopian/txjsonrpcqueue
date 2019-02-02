@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
-from txjsonrpcqueue import AioWildcardQueue as WildcardQueue
-from txjsonrpcqueue import AioRpcForwarder as RpcForwarder
+from txjsonrpcqueue.asyncio import WildcardQueue, RpcForwarder
 
 def process_result(result):
     try:

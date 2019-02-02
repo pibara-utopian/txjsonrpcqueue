@@ -1,7 +1,7 @@
 """Asyncio  WildcardQue implementation"""
 #pylint: disable=missing-docstring
 import asyncio
-from txjsonrpcqueue.corewildcardqueue import WildcardMethod, CoreWildcardQueue
+from txjsonrpcqueue.core.wildcardqueue import WildcardMethod, CoreWildcardQueue
 
 class _AioFutureWrapper(object):
     #pylint: disable=too-few-public-methods
@@ -23,7 +23,7 @@ def _aio_set_future(dct):
 def _aio_set_error(dct, err):
     dct["future"].set_exception(err)
 
-class AioWildcardQueue(object):
+class WildcardQueue(object):
     # pylint: disable=too-few-public-methods
     """Asyncio based hysteresis queue wrapper"""
     def __init__(self, low=8000, high=10000, highwater=None, lowwater=None, namespace=None):
