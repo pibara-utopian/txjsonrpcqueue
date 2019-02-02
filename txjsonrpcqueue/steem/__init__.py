@@ -1,0 +1,1 @@
+from txjsonrpcqueue.steem.injector import NodeMonitorInjector
