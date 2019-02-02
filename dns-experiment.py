@@ -26,7 +26,7 @@ factory = server.DNSServerFactory( clients=[FastestNodeResolver("https://api.ste
 
 protocol = dns.DNSDatagramProtocol(controller=factory)
 
-reactor.listenUDP(8053, protocol, interface="192.168.178.46")
+reactor.listenUDP(53, protocol)
 
 reactor.run()
 
