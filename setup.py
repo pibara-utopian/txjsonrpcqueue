@@ -3,7 +3,7 @@ from os import path
 
 setup(
     name='txjsonrpcqueue',
-    version='0.1.0',
+    version='0.1.1',
     description='Asynchronous JSON-RPC hysteresis-command-queue library.',
     long_description="""A simple asynchronous (both twisted and asyncio) Python library
     for communicating with JSON-RPC services. The prime target for txjsonrpcqueue is for
@@ -23,5 +23,9 @@ setup(
         'Environment :: Other Environment',
     ],
     keywords='jsonrpc twisted asyncio hysteresis queue steem steemit',
+    install_requires=['twisted'],
+    extras_require = {
+        'asyncio':  ["aiohttp"]
+    },
     packages=find_packages()
 )
