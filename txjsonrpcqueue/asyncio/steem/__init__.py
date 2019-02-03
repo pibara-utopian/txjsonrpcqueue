@@ -1,1 +1,1 @@
-from txjsonrpcqueue.asyncio.steem.injector import NodeMonitorInjector
+from txjsonrpcqueue.asyncio.steem.injector import EmbeddedHealthHostInjector

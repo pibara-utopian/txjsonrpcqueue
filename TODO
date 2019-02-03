@@ -1,0 +1,20 @@
+0.2:
+
+* Fix Python2/Twisted portability for steem.EmbeddedHealthHostInjector
+* Document the code
+* Make pylint happy
+* Find and fix problem with pypi and/or setup.py
+
+0.3:
+* Docker container for DNS server around steem.EmbeddedHealthHostInjector
+* Write fully portable generic.DNSHealthHostInjector
+
+0.3:
+* Write fully portable DateFinder
+* Write fully portable ActiveBlockChain
+
+0.4:
+* Write maximum-compatible asyncsteem API 
+
+0.5:
+* Write fully postable steem.AccountKey implementation

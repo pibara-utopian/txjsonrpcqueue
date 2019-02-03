@@ -2,11 +2,11 @@
 import time
 import json
 import asyncio
-from txjsonrpcqueue.asyncio.steem import NodeMonitorInjector
+from txjsonrpcqueue.asyncio.steem import EmbeddedHealthHostInjector
 
 class FastestNodeResolver(object):
     def __init__(self, start_node):
-        self.injector = NodeMonitorInjector(start_node)
+        self.injector = EmbeddedHealthHostInjector(start_node)
         self.injector.register_forwarder(self)
         self.fastest_node = start_node
     def inject_host_url(self, url):

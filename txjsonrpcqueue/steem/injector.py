@@ -4,7 +4,7 @@ import json
 from txjsonrpcqueue import Portable
 from txjsonrpcqueue.core.steem import MonitorSet, FastestNode
 
-class NodeMonitorInjector(object):
+class EmbeddedHealthHostInjector(object):
     def __init__(self, start_node):
         portable = Portable()
         self.fnod = FastestNode(start_node, self.update_fastest)

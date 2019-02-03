@@ -3,11 +3,11 @@ import time
 import json
 from twisted.names import client, dns, error, server
 from twisted.internet import reactor
-from txjsonrpcqueue.steem import NodeMonitorInjector
+from txjsonrpcqueue.steem import EmbeddedHealthHostInjector
 
 class FastestNodeResolver(object):
     def __init__(self, start_node):
-        self.injector = NodeMonitorInjector(start_node)
+        self.injector = EmbeddedHealthHostInjector(start_node)
         self.injector.register_forwarder(self)
         self.fastest_node = start_node
     def inject_host_url(self, url):
