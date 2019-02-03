@@ -3,7 +3,7 @@ from os import path
 
 setup(
     name='txjsonrpcqueue',
-    version='0.1.1',
+    version='0.1.2',
     description='Asynchronous JSON-RPC hysteresis-command-queue library.',
     long_description="""A simple asynchronous (both twisted and asyncio) Python library
     for communicating with JSON-RPC services. The prime target for txjsonrpcqueue is for
