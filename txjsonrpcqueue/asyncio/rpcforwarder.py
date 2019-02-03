@@ -44,7 +44,7 @@ class RpcForwarder:
                 # each of the commands that are part of the batch.
                 #pylint: disable=unused-variable
                 for key, entry_future in futures_map.items():
-                    entry_future.exception(exception)
+                    entry_future.set_exception(exception)
             def close_session(session):
                 """Asynchonically close the session"""
                 def on_closed(result):
