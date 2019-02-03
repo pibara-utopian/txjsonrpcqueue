@@ -1,0 +1,1 @@
+from txjsonrpcqueue.asyncio.steem.injector import NodeMonitorInjector
