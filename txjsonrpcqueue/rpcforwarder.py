@@ -42,10 +42,10 @@ class RpcForwarder:
             host_injector.register_forwarder(self)
         else:
             #Set our static host url and start processing batches imediately.
-            if isinstance(host_url, str):
-                self.host_url = host_url.encode("utf8")
-            else:
+            if isinstance(host_url, bytes):
                 self.host_url = host_url
+            else:
+                self.host_url = host_url.encode("utf8")
             self._fetch_batch()
     def inject_host_url(self, url):
         #Set the host url to its new value

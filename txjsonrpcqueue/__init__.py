@@ -17,7 +17,7 @@ class Portable(object):
             fod.addBoth(finaly)
     def callLater(self, time, func, *args):
         reactor.callLater(time, func, *args)
-    def makeWildcardQueue(self,low=8000, high=10000, highwater=None, lowwater=None, namespace=None):
+    def makeWildcardQueue(self, low=8000, high=10000, highwater=None, lowwater=None, namespace=None):
         return WildcardQueue(low, high, highwater, lowwater, namespace)
     def makeRpcForwarder(self, queue, host_injector=None, host_url=None):
         return RpcForwarder(queue, host_injector, host_url)
