@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Experimental DNS resolving STEEM API-NODE monitor.
+
+As soon as the problem with "python3 setup.py bdist" + "twine upload dist/*.tar.gz" is resolved
+and no longer results in "Could not find a version that satisfies the requirement txjsonrpcqueue",
+this script should move to its own repo.
+
+FIXME
+"""
+import logging
+from twisted.python import log
+from twisted.names import dns, error, server
+from twisted.internet import reactor, defer
+from txjsonrpcqueue.steem import EmbeddedHealthHostInjector
+
+class FastestNodeResolver(object):
+    """DNS resolver class that only responds with the currently fastest JSON-RPC STEEM API node"""
+    def __init__(self, start_node):
+        self.injector = EmbeddedHealthHostInjector(start_node)
+        self.injector.register_forwarder(self)
+        self.fastest_node = start_node
+    def inject_host_url(self, url):
+        """Entry point for EmbeddedHealthHostInjector events"""
+        self.fastest_node = url
+        log.msg("Updating response string to" + url)
+    def query(self, query, timeout=None):
+        """DNS Query resolver that only resolves TXT queries"""
+        #pylint: disable=unused-argument
+        if query.type == dns.TXT:
+            log.msg("Responding to TXT query")
+            response = self.fastest_node
+            payload = dns.Record_TXT(response.encode("utf8"), ttl=90)
+            answer = dns.RRHeader(query.name.name,
+                                  type=dns.TXT,
+                                  cls=dns.IN,
+                                  ttl=90,
+                                  payload=payload)
+            return [answer], [], []
+        log.msg("Unexpected query of type " + str(query.type))
+        return defer.fail(error.DomainError())
+
+
+#Set up some basic logging
+log.PythonLoggingObserver().start()
+logging.basicConfig(filename="dns-experiment.log", level=logging.DEBUG)
+
+#Instantiate DNS resolving and monitoring classes.
+FACTORY = server.DNSServerFactory(
+    clients=[FastestNodeResolver(["https://api.steemit.com",
+                                  "https://rpc.steemviz.com",
+                                  "https://appbasetest.timcliff.com"])])
+
+#Make DNS resolver work on a non standard port so it doesn't need to run as root.
+#Will need to set up NAT, either in rooter, or using Docker port mapping.
+PROTOCOL = dns.DNSDatagramProtocol(controller=FACTORY)
+#pylint: disable=no-member
+reactor.listenUDP(9053, PROTOCOL)
+#Start the reactor
+reactor.run()

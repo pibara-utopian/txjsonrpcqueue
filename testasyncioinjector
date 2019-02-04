@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""Demo script for testing the asyncio version of the EmbeddedHealthHostInjector"""
+import asyncio
+#Import the asyncio version of steem import.EmbeddedHealthHostInjector
+from txjsonrpcqueue.asyncio.steem import EmbeddedHealthHostInjector
+
+class InjectLogger(object):
+    #pylint: disable=too-few-public-methods
+    """Class that only logs what gets injected. In the asyncio version we just use print."""
+    def __init__(self, start_node):
+        self.injector = EmbeddedHealthHostInjector(start_node)
+        self.injector.register_forwarder(self)
+        self.fastest_node = start_node
+    def inject_host_url(self, url):
+        """Entry point for EmbeddedHealthHostInjector events"""
+        self.fastest_node = url
+        print(url)
+
+#Instantiate our inject logger
+FR = InjectLogger("https://api.steemit.com")
+
+#Run the asyncio loop
+LOOP = asyncio.get_event_loop()
+LOOP.run_forever()
+LOOP.close()

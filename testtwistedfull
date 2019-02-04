@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Demo script for testing with an URL initiated RPCForwarder"""
+from twisted.internet import reactor
+from txjsonrpcqueue import WildcardQueue, RpcForwarder
+from txjsonrpcqueue.steem import EmbeddedHealthHostInjector
+
+def process_result(res):
+    """Process results from JSON-RPC call"""
+    print("#########################################################")
+    print(res)
+    print("---------------------------------------------------------")
+
+def oops(exception):
+    """Process error from JSON-RPC call"""
+    print("OOPS:", exception)
+
+#Instantiate a single wildcard queue
+WQ = WildcardQueue(low=8000, high=10000, namespace="condenser_api")
+#Instantiate an EmbeddedHealthHostInjector
+EHI = EmbeddedHealthHostInjector("https://api.steemit.com")
+#Bind an RpcForwarder as consumer to the wildcard queue
+FW = RpcForwarder(queue=WQ, host_injector=EHI)
+#Loop over a small set of block numbers
+for index in range(12345670, 12345679):
+    #Invoke get_block using the default namespace defined in queue creation
+    d1 = WQ.get_block(index)
+    d1.addCallbacks(process_result, oops)
+    #Invoke get_block using the block_api namespace
+    d2 = WQ.block_api.get_block(block_num=index)
+    d2.addCallbacks(process_result, oops)
+#Finaly call an non existing block_api RPC call
+D3 = WQ.block_api.bogus_api_call(block_num=77)
+D3.addCallbacks(process_result, oops)
+#Start the asyncio event loop
+#pylint: disable=no-member
+reactor.run()

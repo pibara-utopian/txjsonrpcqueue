@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Demo script for testing with an URL initiated RPCForwarder"""
+import asyncio
+#Import the asyncio version of WildcardQueue and RpcForwarder
+from txjsonrpcqueue.asyncio import WildcardQueue, RpcForwarder
+
+def process_result(result):
+    """Process results from JSON-RPC call"""
+    #pylint: disable=broad-except
+    try:
+        res = result.result()
+        print("#########################################################")
+        print(res)
+        print("---------------------------------------------------------")
+    except Exception as exception:
+        print("OOPS:", exception)
+
+#Instantiate a single wildcard queue
+WQ = WildcardQueue(low=8000, high=10000, namespace="condenser_api")
+#Bind an RpcForwarder as consumer to the wildcard queue
+FW = RpcForwarder(queue=WQ, host_url="https://api.steemit.com")
+#Loop over a small set of block numbers
+for index in range(12345670, 12345679):
+    #Invoke get_block using the default namespace defined in queue creation
+    f1 = WQ.get_block(index)
+    f1.add_done_callback(process_result)
+    #Invoke get_block using the block_api namespace
+    f2 = WQ.block_api.get_block(block_num=index)
+    f2.add_done_callback(process_result)
+#Finaly call an non existing block_api RPC call
+F3 = WQ.block_api.bogus_api_call(block_num=77)
+F3.add_done_callback(process_result)
+#Start the asyncio event loop
+LOOP = asyncio.get_event_loop()
+LOOP.run_forever()
+LOOP.close()

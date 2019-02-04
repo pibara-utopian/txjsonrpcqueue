@@ -1,6 +1,22 @@
-from setuptools import setup, find_packages
-from os import path
+"""Currently possibly broken setup script for unused-argument
 
+
+Note: Script does seem to work when run directly with pip:
+
+        pip3 install .
+
+
+      Pip install however does no longer work after uploading to pypi:
+
+        python3 setup.py bdist
+        twine upload dist/txjsonrpcqueue*.tar.gz
+        cd ..
+        pip3 install txjsonrpcqueue
+
+        FIXME!
+
+"""
+from setuptools import setup, find_packages
 setup(
     name='txjsonrpcqueue',
     version='0.1.2',
@@ -24,7 +40,7 @@ setup(
     ],
     keywords='jsonrpc twisted asyncio hysteresis queue steem steemit',
     install_requires=['twisted'],
-    extras_require = {
+    extras_require={
         'asyncio':  ["aiohttp"]
     },
     packages=find_packages()

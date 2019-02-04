@@ -7,8 +7,12 @@ from txjsonrpcqueue.core.steem import MonitorSet, FastestNode
 class EmbeddedHealthHostInjector(object):
     def __init__(self, start_node):
         portable = Portable()
-        self.fnod = FastestNode(start_node, self.update_fastest)
-        self.monitorset = MonitorSet([start_node],self.fnod, portable)
+        if isinstance(start_node, list):
+            self.fnod = FastestNode(start_node[0], self.update_fastest)
+            self.monitorset = MonitorSet(start_node,self.fnod, portable)
+        else:
+            self.fnod = FastestNode(start_node, self.update_fastest)
+            self.monitorset = MonitorSet([start_node],self.fnod, portable)
         self.forwarders = set()
     def register_forwarder(self,forwarder):
         self.forwarders.add(forwarder)
