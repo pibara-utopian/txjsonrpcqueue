@@ -48,6 +48,7 @@ class RpcForwarder:
             def close_session(session):
                 """Asynchonically close the session"""
                 def on_closed(result):
+                    #pylint: disable=broad-except
                     try:
                         result.result()
                     except Exception:
@@ -58,6 +59,7 @@ class RpcForwarder:
                 """Process JSON-RPC batch response body"""
                 def process_response_json(resp_json):
                     """Process JSON-RPC batch response body JSON content."""
+                    #pylint: disable=broad-except
                     try:
                         #Parse the JSON content of the JSON-RPC batch response.
                         resp_obj = json.loads(resp_json)
