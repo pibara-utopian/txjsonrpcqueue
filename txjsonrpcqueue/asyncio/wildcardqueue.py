@@ -30,7 +30,7 @@ class WildcardQueue(object):
         #pylint: disable=too-many-arguments
         self.namespace = namespace
         self.core = CoreWildcardQueue(_AioSoon(), low, high, highwater, lowwater)
-    def json_rpcqueue_get(self, maxbatch=20):
+    def json_rpcqueue_get(self, maxbatch=10):
         """Fetch an entry from the queue, imediately if possible, or remember
            callback for when an entry becomes available."""
         future_get = asyncio.Future()

@@ -1,5 +1,9 @@
 0.2:
 
+* Figure out what to do with:
+   {"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"Internal Error","data":{"error_id":"2b849e5c-da74-47c4-a425-1e454a3b5242","jussi_request_id":"000524667355124877"}}}
+   as response to a batch.
+   ( https://rpc.steemviz.com )  
 * Testing of exception handling
 * Find and fix problem with pypi and/or setup.py
 

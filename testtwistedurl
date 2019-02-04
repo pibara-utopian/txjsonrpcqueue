@@ -2,6 +2,7 @@
 """Demo script for testing with an URL initiated RPCForwarder"""
 from twisted.internet import reactor
 from txjsonrpcqueue import WildcardQueue, RpcForwarder
+from txjsonrpcqueue.exception import JsonRpcBatchError
 
 def process_result(res):
     """Process results from JSON-RPC call"""
@@ -12,6 +13,12 @@ def process_result(res):
 def oops(exception):
     try:
         exception.raiseException()
+    except JsonRpcBatchError as exp:
+        print("########")
+        print(exp)
+        print(exp.code)
+        print(exp.body)
+        print("###--###")
     except Exception as excep:
         """Process error from JSON-RPC call"""
         print("OOPS:", excep)
@@ -19,7 +26,7 @@ def oops(exception):
 #Instantiate a single wildcard queue
 WQ = WildcardQueue(low=8000, high=10000, namespace="condenser_api")
 #Bind an RpcForwarder as consumer to the wildcard queue
-FW = RpcForwarder(queue=WQ, host_url="https://api.steemit.com")
+FW = RpcForwarder(queue=WQ, host_url="https://rpc.steemviz.com")
 #Loop over a small set of block numbers
 for index in range(12345670, 12345679):
     #Invoke get_block using the default namespace defined in queue creation

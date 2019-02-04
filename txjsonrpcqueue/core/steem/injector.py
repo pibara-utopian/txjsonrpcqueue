@@ -82,7 +82,8 @@ class _ApiNodeMonitor(object):
                     #There may be new nodes in here
                     self.monitorset.process_node_url(filtered_node)
             except Exception as exception:
-                print(exception)
+                pass
+                #print(exception)
             self.state_ok = True
         def process_error(error):
             """Process error from condenser_api.get_accounts call"""

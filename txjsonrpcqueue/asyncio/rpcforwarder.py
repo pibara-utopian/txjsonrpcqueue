@@ -155,6 +155,14 @@ class RpcForwarder:
             newcmd["params"] = cmd["params"]
             futures_map[self.cmd_id] = cmd["future"]
             batch_out.append(newcmd)
+        #Piggybag extra command onto single command batches. FIXME: this is a temporary workaround.
+        if len(batch_out) == 1:
+            newcmd = dict()
+            newcmd["id"] = 0
+            newcmd["jsonrpc"] = "2.0"
+            newcmd["method"] = "bogus_api.bogus_method"
+            newcmd["params"] = []
+            batch_out.append(newcmd)
         #Post the JSON-RPC batch request to the server and wait for response
         resp = asyncio.ensure_future(session.post(self.host_url, json=batch_out))
         resp.add_done_callback(process_response)

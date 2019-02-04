@@ -152,6 +152,14 @@ class RpcForwarder:
             newcmd["params"] = cmd["params"]
             deferreds_map[self.cmd_id] = cmd["deferred"]
             batch_out.append(newcmd)
+        #Piggybag extra command onto single command batches. FIXME: this is a temporary workaround.
+        if len(batch_out) == 1:
+            newcmd = dict()
+            newcmd["id"] = 0
+            newcmd["jsonrpc"] = "2.0"
+            newcmd["method"] = "bogus_api.bogus_method"
+            newcmd["params"] = []
+            batch_out.append(newcmd)
         #Post the JSON-RPC batch request to the server and wait for response
         deferred_response = self.agent.request(
             b'POST',
