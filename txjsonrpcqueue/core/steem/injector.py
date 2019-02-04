@@ -39,8 +39,8 @@ class _ApiNodeMonitor(object):
     def __init__(self, url, monitorset, fastest_node, portable):
         self.url = url
         self.monitorset = monitorset
-        self.wq = portable.makeWildcardQueue(low=80, high=100, namespace="condenser_api")
-        self.fw = portable.makeRpcForwarder(queue=self.wq, host_url=url)
+        self.wq = portable.make_wildcard_queue(low=80, high=100, namespace="condenser_api")
+        self.fw = portable.make_rpc_forwarder(queue=self.wq, host_url=url)
         self.ok=None
         self.perm_fail = False
         self.fastest_node = fastest_node

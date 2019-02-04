@@ -4,7 +4,8 @@ import json
 from twisted.web.client import Agent, readBody
 from twisted.web.http_headers import Headers
 from twisted.internet import reactor, defer
-from txjsonrpcqueue.exception import HttpError, HttpServerError, HttpClientError, JsonRpcBatchError, JsonRpcCommandError, JsonRpcCommandResponseError
+from txjsonrpcqueue.exception import HttpServerError, HttpClientError, JsonRpcBatchError
+from txjsonrpcqueue.exception import JsonRpcCommandError, JsonRpcCommandResponseError
 
 #Simple helper class for JSON-RPC response storage
 class _StringProducer(object):
@@ -35,6 +36,7 @@ class RpcForwarder:
         self.queue = queue
         self.cmd_id = 0
         self.started = False
+        #For the twisted implementation we build on twisted.web.client.Agent
         self.agent = Agent(reactor)
         if host_injector:
             #Register ourselves with the host injector object. Don't start yet untill the host
@@ -67,29 +69,35 @@ class RpcForwarder:
             #pylint: disable=unused-variable
             for key, entry_deferred in deferreds_map.items():
                 entry_deferred.errback(exception)
+        def process_json_parse_error(code, body):
+            """Convert a json parse error and HTTP error code into appropriate exception type"""
+            if code > 499: #5xx server side error codes
+                process_batch_level_exception(HttpServerError(code, body))
+            else:
+                if code > 399: #4xx client side errors.
+                    process_batch_level_exception(
+                        HttpClientError(code, body))
+                else:
+                    # Non-error code in the 2xx and 3xx range.
+                    process_batch_level_exception(
+                        JsonRpcBatchError(code, body,
+                                          "Invalid JSON returned by server"))
         def process_response(response):
             code = response.code
             def process_body(text_result):
                 """Process JSON-RPC batch response body"""
+                #pylint: disable=broad-except, unused-variable
                 try:
                     #Parse the JSON content of the JSON-RPC batch response.
                     resp_obj = json.loads(text_result)
-                    #pylint: disable=broad-except
                 except json.decoder.JSONDecodeError as exception:
-                    if code >499:
-                        process_batch_level_exception(HttpServerError(code,text_result.decode()))
-                    else:
-                        if code > 399:
-                            process_batch_level_exception(HttpClientError(code,text_result.decode()))
-                        else:
-                            process_batch_level_exception(JsonRpcBatchError(code,text_result.decode(),
-                                                          "Invalid JSON returned by server"))
+                    process_json_parse_error(code, text_result.decode())
                     resp_obj = None
                 if resp_obj:
                     #Assert the parsed JSON is a list.
                     if not isinstance(resp_obj, list):
                         process_batch_level_exception(
-                            JsonRpcBatchError(code,text_result.decode(),
+                            JsonRpcBatchError(code, text_result.decode(),
                                               "Non-batch JSON response from server."))
                     else:
                         #Process the individual command responses
@@ -105,24 +113,24 @@ class RpcForwarder:
                                 if "result" in response:
                                     #Set future result
                                     query_deferred.callback(response["result"])
-                                else:
-
-                                    if "error" in response and \
-                                            "message" in response["error"] and \
-                                            "code" in response["error"] and \
-                                            "data" in response["error"]:
-                                        query_deferred.errback(
-                                            JsonRpcCommandError(response["error"]["code"],
-                                                                response["error"]["message"],
-                                                                response["error"]["data"]))
-                                    else:
-                                        query_deferred.errback(
-                                            JsonRpcCommandResponseError("Bad command response from server", response))
+                                if (not "result" in response) and "error" in response and \
+                                        "message" in response["error"] and \
+                                        "code" in response["error"] and \
+                                        "data" in response["error"]:
+                                    query_deferred.errback(
+                                        JsonRpcCommandError(response["error"]["code"],
+                                                            response["error"]["message"],
+                                                            response["error"]["data"]))
+                                if (not "result" in response) and (not "error" in response):
+                                    query_deferred.errback(
+                                        JsonRpcCommandResponseError(
+                                            "Bad command response from server", response))
                         #Work through any request item id not found in the response.
                         for no_valid_response_id in unprocessed:
                             query_future = deferreds_map[no_valid_response_id]
                             query_future.errback(
-                                JsonRpcCommandResponseError("Request command id not found in response.", resp_obj))
+                                JsonRpcCommandResponseError(
+                                    "Request command id not found in response.", resp_obj))
                 self._fetch_batch()
             #Get (text) content from the server response
             body_deferred = readBody(response)
@@ -153,4 +161,3 @@ class RpcForwarder:
         #Notify the queue that we are ready to receive a batch.
         batch_deferred = self.queue.json_rpcqueue_get()
         batch_deferred.addCallback(self._process_batch)
-
