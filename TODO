@@ -1,7 +1,6 @@
 0.2:
 
-* Document the code
-* Make pylint happy
+* Testing of exception handling
 * Find and fix problem with pypi and/or setup.py
 
 0.3:

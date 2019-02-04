@@ -15,7 +15,7 @@ def process_result(result):
         print(res)
         print("---------------------------------------------------------")
     except Exception as exception:
-        print("OOPS:", exception)
+        print("OOPS:", exception, type(exception))
 
 #Instantiate a single wildcard queue
 WQ = WildcardQueue(low=8000, high=10000, namespace="condenser_api")

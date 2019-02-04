@@ -22,7 +22,7 @@ class FastestNodeResolver(object):
     def inject_host_url(self, url):
         """Entry point for EmbeddedHealthHostInjector events"""
         self.fastest_node = url
-        log.msg("Updating response string to" + url)
+        log.msg("Updating response string to " + url)
     def query(self, query, timeout=None):
         """DNS Query resolver that only resolves TXT queries"""
         #pylint: disable=unused-argument

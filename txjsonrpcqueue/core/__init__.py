@@ -1,4 +1,5 @@
 #pylint: disable=missing-docstring
-"""Batch oriented JSON-RPC library for Twisted and asyncio.
+"""Core implementations. DON'T USE if you are a user of this lib.
+Only meant for implementation classes not part of the API.
 """
 from txjsonrpcqueue.core.wildcardqueue import CoreWildcardQueue

@@ -51,7 +51,10 @@ class RpcForwarder:
             self._fetch_batch()
     def inject_host_url(self, url):
         #Set the host url to its new value
-        self.host_url = url
+        if isinstance(url, bytes):
+            self.host_url = url
+        else:
+            self.host_url = url.encode("utf8")
         #If we weren't started yet, start fetching batches now.
         if not self.started:
             self._fetch_batch()
@@ -99,6 +102,7 @@ class RpcForwarder:
                         process_batch_level_exception(
                             JsonRpcBatchError(code, text_result.decode(),
                                               "Non-batch JSON response from server."))
+                        resp_obj = []
                     else:
                         #Process the individual command responses
                         for response in resp_obj:
@@ -127,8 +131,8 @@ class RpcForwarder:
                                             "Bad command response from server", response))
                         #Work through any request item id not found in the response.
                         for no_valid_response_id in unprocessed:
-                            query_future = deferreds_map[no_valid_response_id]
-                            query_future.errback(
+                            query_deferred = deferreds_map[no_valid_response_id]
+                            query_deferred.errback(
                                 JsonRpcCommandResponseError(
                                     "Request command id not found in response.", resp_obj))
                 self._fetch_batch()

@@ -13,8 +13,14 @@ class Portable(object):
     #pylint: disable=no-self-use
     def set_callbacks(self, fod, on_ok, on_fail=None, finaly=None):
         """Twisted implementation of portable callback setter interface."""
+        def on_failure(failure):
+            #pylint: disable=broad-except
+            try:
+                failure.raiseException()
+            except Exception as exception:
+                on_fail(exception)
         if on_fail:
-            fod.addCallbacks(on_ok, on_fail)
+            fod.addCallbacks(on_ok, on_failure)
         else:
             fod.addCallback(on_ok)
         if finaly:

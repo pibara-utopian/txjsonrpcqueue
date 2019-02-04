@@ -10,8 +10,11 @@ def process_result(res):
     print("---------------------------------------------------------")
 
 def oops(exception):
-    """Process error from JSON-RPC call"""
-    print("OOPS:", exception)
+    try:
+        exception.raiseException()
+    except Exception as excep:
+        """Process error from JSON-RPC call"""
+        print("OOPS:", excep)
 
 #Instantiate a single wildcard queue
 WQ = WildcardQueue(low=8000, high=10000, namespace="condenser_api")

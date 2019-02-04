@@ -3,6 +3,9 @@
 import json
 import asyncio
 import aiohttp
+from txjsonrpcqueue.exception import HttpServerError, HttpClientError, JsonRpcBatchError
+from txjsonrpcqueue.exception import JsonRpcCommandError, JsonRpcCommandResponseError
+
 
 class RpcForwarder:
     # pylint: disable=too-few-public-methods
@@ -38,6 +41,7 @@ class RpcForwarder:
         #Start a new session (may want to look into reusing strategy here)
         session = aiohttp.ClientSession()
         def process_response(response):
+            code = 200
             def process_batch_level_exception(exception):
                 """Spread batch level exception to each of the batch entries"""
                 #On a batch level exception, forward the cought exception to the future for
@@ -45,6 +49,19 @@ class RpcForwarder:
                 #pylint: disable=unused-variable
                 for key, entry_future in futures_map.items():
                     entry_future.set_exception(exception)
+            def process_json_parse_error(code, body):
+                """Convert a json parse error and HTTP error code into appropriate exception type"""
+                if code > 499: #5xx server side error codes
+                    process_batch_level_exception(HttpServerError(code, body))
+                else:
+                    if code > 399: #4xx client side errors.
+                        process_batch_level_exception(
+                            HttpClientError(code, body))
+                    else:
+                        # Non-error code in the 2xx and 3xx range.
+                        process_batch_level_exception(
+                            JsonRpcBatchError(code, body,
+                                              "Invalid JSON returned by server"))
             def close_session(session):
                 """Asynchonically close the session"""
                 def on_closed(result):
@@ -63,46 +80,47 @@ class RpcForwarder:
                     try:
                         #Parse the JSON content of the JSON-RPC batch response.
                         resp_obj = json.loads(resp_json)
-                        #Assert the parsed JSON is a list.
-                        if not isinstance(resp_obj, list):
-                            process_batch_level_exception(
-                                RuntimeError("Non-batch JSON response from server " \
-                                    + self.host_url + " : " + resp_json))
-                        #Process the individual command responses
-                        for response in resp_obj:
-                            #Get the id from the response to match with the apropriate reuest
-                            if "id" in response and response["id"] in unprocessed:
-                                query_id = response["id"]
-                                #Maintain list of unprocessed id's
-                                unprocessed.remove(query_id)
-                                #Look up the proper command future to map this response to.
-                                query_future = futures_map[query_id]
-                                #Distinguish between responses and errors.
-                                if "result" in response:
-                                    #Set future result
-                                    query_future.set_result(response["result"])
-                                else:
-                                    if "error" in response and "message" in response["error"]:
-                                        query_future.set_exception(
-                                            RuntimeError(response["error"]["message"]))
-                                    else:
-                                        query_future.set_exception(
-                                            RuntimeError(
-                                                "Neither result nor valid error field "\
-                                                + "in response from server "\
-                                                + self.host_url + " :" + resp_json))
-                        #Work through any request item id not found in the response.
+                    except json.decoder.JSONDecodeError:
+                        process_json_parse_error(code, resp_json)
+                        resp_obj = []
+                    #Assert the parsed JSON is a list.
+                    if not isinstance(resp_obj, list):
+                        process_batch_level_exception(
+                            JsonRpcBatchError(code, resp_json,
+                                              "Non-batch JSON response from server."))
+                        resp_obj = []
+                    #Process the individual command responses
+                    for response in resp_obj:
+                        #Get the id from the response to match with the apropriate reuest
+                        if "id" in response and response["id"] in unprocessed:
+                            query_id = response["id"]
+                            #Maintain list of unprocessed id's
+                            unprocessed.remove(query_id)
+                            #Look up the proper command future to map this response to.
+                            query_future = futures_map[query_id]
+                            #Distinguish between responses and errors.
+                            if "result" in response:
+                                #Set future result
+                                query_future.set_result(response["result"])
+                            if (not "result" in response) and "error" in response and \
+                                    "message" in response["error"] and \
+                                    "code" in response["error"] and \
+                                    "data" in response["error"]:
+                                query_future.set_exception(
+                                    JsonRpcCommandError(response["error"]["code"],
+                                                        response["error"]["message"],
+                                                        response["error"]["data"]))
+                            if (not "result" in response) and (not "error" in response):
+                                query_future.set_exception(
+                                    JsonRpcCommandResponseError(
+                                        "Bad command response from server", response))
+                    #Work through any request item id not found in the response.
+                    if resp_obj:
                         for no_valid_response_id in unprocessed:
                             query_future = futures_map[no_valid_response_id]
-                            query_future.set_exception(
-                                RuntimeError(
-                                    "Bad JSON-RPC response from server " \
-                                    + self.host_url \
-                                    + ", request command id not found in response."))
-                    except Exception as exception:
-                        process_batch_level_exception(
-                            RuntimeError(
-                                str(exception) + " " + self.host_url  +  " : " + resp_json))
+                            error = JsonRpcCommandResponseError(
+                                "Request command id not found in response.", resp_obj)
+                            query_future.set_exception(error)
                 try:
                     text = text_result.result()
                     process_response_json(text)
@@ -114,6 +132,7 @@ class RpcForwarder:
             #Get (text) content from the server response
             try:
                 result = response.result()
+                code = result.status
                 txt = asyncio.ensure_future(result.text())
                 txt.add_done_callback(process_body)
             #pylint: disable=broad-except
