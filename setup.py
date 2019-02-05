@@ -19,7 +19,7 @@ Note: Script does seem to work when run directly with pip:
 from setuptools import setup, find_packages
 setup(
     name='txjsonrpcqueue',
-    version='0.1.3',
+    version='0.1.4',
     description='Asynchronous JSON-RPC hysteresis-command-queue library.',
     long_description="""A simple asynchronous (both twisted and asyncio) Python library
     for communicating with JSON-RPC services. The prime target for txjsonrpcqueue is for
