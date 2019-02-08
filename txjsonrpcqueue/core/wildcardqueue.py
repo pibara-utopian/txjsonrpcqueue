@@ -76,7 +76,9 @@ class CoreWildcardQueue(object):
                 self.soon(self.highwater, self.okcount)
                 self.okcount = 0
             return True
-    def  get(self, deferred_get, maxbatch):
+    def again(self, batch):
+        self.msg_queue = batch + self.msg_queue
+    def get(self, deferred_get, maxbatch):
         """Fetch an entry from the queue, imediately if possible, or remember callback for when an
            entry becomes available."""
         rbatch = list()

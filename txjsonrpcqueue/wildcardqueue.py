@@ -30,5 +30,7 @@ class WildcardQueue(object):
         deferred_get = defer.Deferred()
         self.core.get(deferred_get, maxbatch)
         return deferred_get
+    def json_rpcqueue_again(self, batch):
+        self.core.again(batch)
     def __getattr__(self, outername):
         return WildcardMethod(outername, self, _tx_set_deferred, _tx_set_error)

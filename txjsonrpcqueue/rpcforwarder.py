@@ -1,11 +1,17 @@
 """Asyncio RpcForwarder implementation"""
 #pylint: disable=missing-docstring
 import json
+import OpenSSL
+from service_identity.exceptions import VerificationError
+from service_identity.exceptions import DNSMismatch
+from twisted.python import log
 from twisted.web.client import Agent, readBody
 from twisted.web.http_headers import Headers
+from twisted.web.client import ResponseFailed
 from twisted.internet import reactor, defer
 from txjsonrpcqueue.exception import HttpServerError, HttpClientError, JsonRpcBatchError
 from txjsonrpcqueue.exception import JsonRpcCommandError, JsonRpcCommandResponseError
+from txjsonrpcqueue.exception import SSLNameMismatch, SSLError
 
 #Simple helper class for JSON-RPC response storage
 class _StringProducer(object):
@@ -34,6 +40,7 @@ class RpcForwarder:
         if host_injector and host_url:
             raise RuntimeError("Either host_injector or host_url should be specified, not both")
         self.queue = queue
+        self.maxbatch = 10
         self.cmd_id = 0
         self.started = False
         #For the twisted implementation we build on twisted.web.client.Agent
@@ -42,12 +49,14 @@ class RpcForwarder:
             #Register ourselves with the host injector object. Don't start yet untill the host
             # injector injects us with an initial host.
             host_injector.register_forwarder(self)
+            log.msg("RpcForwarder __init__: Injector registered.")
         else:
             #Set our static host url and start processing batches imediately.
             if isinstance(host_url, bytes):
                 self.host_url = host_url
             else:
                 self.host_url = host_url.encode("utf8")
+            log.msg("RpcForwarder __init__: Starting up for " + self.host_url.decode("utf8"))
             self._fetch_batch()
     def inject_host_url(self, url):
         #Set the host url to its new value
@@ -55,8 +64,10 @@ class RpcForwarder:
             self.host_url = url
         else:
             self.host_url = url.encode("utf8")
+        log.msg("Host injected:", self.host_url)
         #If we weren't started yet, start fetching batches now.
         if not self.started:
+            log.msg("RpcForwarder inject_host_url: Starting up for " + self.host_url.decode("utf8"))
             self._fetch_batch()
     def _process_batch(self, batch_in):
         #Map from JSON-RPC to future waiting for result
@@ -78,8 +89,12 @@ class RpcForwarder:
                 process_batch_level_exception(HttpServerError(code, body))
             else:
                 if code > 399: #4xx client side errors.
-                    process_batch_level_exception(
-                        HttpClientError(code, body))
+                    if code == 413 and self.maxbatch > 1:
+                        self.maxbatch = 1
+                        self.queue.json_rpcqueue_again(batch_in)
+                    else:
+                        process_batch_level_exception(
+                            HttpClientError(code, body))
                 else:
                     # Non-error code in the 2xx and 3xx range.
                     process_batch_level_exception(
@@ -138,9 +153,30 @@ class RpcForwarder:
                 self._fetch_batch()
             #Get (text) content from the server response
             body_deferred = readBody(response)
-            body_deferred.addCallback(process_body)
-            body_deferred.addErrback(process_batch_level_exception)
+            body_deferred.addCallbacks(process_body, process_batch_level_exception)
+            body_deferred.addBoth(self._fetch_batch)
             return body_deferred
+        def process_batch_level_exception_and_continue(failure):
+            try:
+                failure.raiseException()
+            except ResponseFailed as exception:
+                failure2 = exception.reasons[0]
+                try:
+                    failure2.raiseException()
+                except VerificationError as exception2:
+                    error = exception2.errors[0]
+                    if isinstance(error,DNSMismatch):
+                        process_batch_level_exception(SSLNameMismatch("Problem with node certificate. Wrong DNS name."))
+                    else:
+                        process_batch_level_exception(SSLError("Problem with node certificate."))
+                except OpenSSL.SSL.Error as exception2:
+                    process_batch_level_exception(SSLError("Problem with node certificate."))
+                except Exception as exception2:
+                    process_batch_level_exception(exception2)
+            except Exception as exception:
+                process_batch_level_exception(exception)
+            self._fetch_batch()
+        log.msg("Processing new batch for " + self.host_url.decode("utf8") + " , " + str(len(batch_in)))
         #Build the output batch and deferred map.
         for cmd in batch_in:
             self.cmd_id += 1
@@ -153,7 +189,7 @@ class RpcForwarder:
             deferreds_map[self.cmd_id] = cmd["deferred"]
             batch_out.append(newcmd)
         #Piggybag extra command onto single command batches. FIXME: this is a temporary workaround.
-        if len(batch_out) == 1:
+        if len(batch_out) == 1 and self.maxbatch > 1:
             newcmd = dict()
             newcmd["id"] = 0
             newcmd["jsonrpc"] = "2.0"
@@ -161,15 +197,16 @@ class RpcForwarder:
             newcmd["params"] = []
             batch_out.append(newcmd)
         #Post the JSON-RPC batch request to the server and wait for response
+        log.msg("Posting batch to node " + self.host_url.decode("utf8"))
         deferred_response = self.agent.request(
             b'POST',
             self.host_url,
             Headers({b"User-Agent"  : [b'TxJsonRpcQueue v0.0.1'],
                      b"Content-Type": [b"application/json"]}),
             _StringProducer(json.dumps(batch_out).encode("utf8")))
-        deferred_response.addCallback(process_response)
-        deferred_response.addErrback(process_batch_level_exception)
-    def _fetch_batch(self):
+        deferred_response.addCallbacks(process_response, process_batch_level_exception_and_continue)
+    def _fetch_batch(self, arg=None):
+        log.msg("Asking queue for a new batch (" + str(self.maxbatch) + ")")
         #Notify the queue that we are ready to receive a batch.
-        batch_deferred = self.queue.json_rpcqueue_get()
+        batch_deferred = self.queue.json_rpcqueue_get(self.maxbatch)
         batch_deferred.addCallback(self._process_batch)

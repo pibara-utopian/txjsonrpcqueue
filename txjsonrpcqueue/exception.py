@@ -1,4 +1,11 @@
 """Exceprion classes used by txjsonrpcqueue"""
+
+class SSLError(Exception):
+    """Base class for SSL errors"""
+
+class SSLNameMismatch(SSLError):
+    """SSL error: dns name mismatch"""
+
 class HttpError(Exception):
     """Base class for HTTP errors"""
     def __init__(self, code, body):

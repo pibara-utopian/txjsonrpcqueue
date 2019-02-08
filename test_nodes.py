@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import json
+import logging
+from twisted.python import log
 from twisted.internet import reactor
 import txjsonrpcqueue
 
@@ -130,7 +132,10 @@ def print_result(url, result):
                 print("+ PARTIAL:", api)
         else:
             print("+ SUCCESS:", api)
-            
+
+log.PythonLoggingObserver().start()
+logging.basicConfig(filename="test_nodes.log", level=logging.DEBUG)
+
 nodes = ["https://steemd.minnowsupportproject.org",
          "https://rpc.usesteem.com",
          "https://rpc.steemviz.com",
