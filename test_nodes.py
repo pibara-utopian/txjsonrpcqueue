@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import logging
+import time
 from twisted.python import log
 from twisted.internet import reactor
 import txjsonrpcqueue
@@ -10,20 +11,30 @@ class AppbaseTest(object):
         self.callback = callback
         self.testcount = 0
         self.results = dict()
+        self.results["bad_errors"] = list()
+        self.start_time = time.time()
     def add_command(self, api, condenser, call):
         def ok_fun(result):
             if not api in self.results:
                 self.results[api] = dict()
             self.results[api][condenser] = True
         def fail_fun(err):
-            if not api in self.results:
-                self.results[api] = dict()
-            self.results[api][condenser] =False
-            #print(api, condenser, err)
+            try:
+                err.raiseException()
+            except txjsonrpcqueue.exception.JsonRpcCommandError as exception:
+                if not api in self.results:
+                    self.results[api] = dict()
+                self.results[api][condenser] =False
+            except Exception as exception:
+                if not api in self.results:
+                    self.results[api] = dict()
+                self.results[api][condenser] =False
+                self.results["bad_errors"].append(exception)
         def finaly_fun(hmm=None):
             self.testcount -= 1
             if self.testcount == 0:
-                self.callback(self.results)
+                duration = time.time() - self.start_time
+                self.callback(self.results, duration)
         self.testcount +=1
         call.addCallbacks(ok_fun, fail_fun)
         call.addBoth(finaly_fun)
@@ -34,8 +45,8 @@ class Node(object):
         self.appbase = txjsonrpcqueue.WildcardQueue(low=8000, high=10000, namespace="condenser_api")
         self.forwarder = txjsonrpcqueue.RpcForwarder(queue=self.appbase, host_url=url)
     def test(self, callback):
-        def cbwrapper(rval):
-            callback(self.url,rval)
+        def cbwrapper(rval, duration):
+            callback(self.url, rval, duration )
         abt = AppbaseTest(cbwrapper)
         abt.add_command(
             api="account_by_key", 
@@ -93,6 +104,10 @@ class Node(object):
             call=self.appbase.rc_api.find_rc_accounts(accounts=["mattockfs"]))
         abt.add_command(
             api="reputation",
+            condenser=True,
+            call=self.appbase.condenser_api.get_account_reputations("mattockfs", 1))
+        abt.add_command(
+            api="reputation",
             condenser=False,
             call=self.appbase.reputation_api.get_account_reputations(account_lower_bound="mattockfs", limit=1))
         abt.add_command(
@@ -112,26 +127,43 @@ class Node(object):
             condenser=False,
             call=self.appbase.block_api.get_block(block_num=30000000))
 
-def print_result(url, result):
-    print(url)
-    for api in result:
-        rescount = 0
-        okcount = 0
-        if True in result[api]:
-            rescount += 1
-            if result[api][True] == True:
-                okcount += 1
-        if False in result[api]:
-            rescount += 1
-            if result[api][False] == True:
-                okcount += 1
-        if rescount != okcount:
-            if okcount == 0:
-                print("+ FAILURE:", api)
-            else:
-                print("+ PARTIAL:", api)
+def print_result(url, result, duration):
+    print("# ", url)
+    print()
+    print("| | result | notes |")
+    print("| --- | --- |---")
+    dur = int(1000*duration)/1000
+    print("| Test Duration |", dur, "s | |")
+    if result["bad_errors"]:
+        if isinstance(result["bad_errors"][0], txjsonrpcqueue.exception.JsonRpcBatchError):
+            print("| Fatal Error |",  str(result["bad_errors"][0]), "|" + result["bad_errors"][0].body  + " |")
         else:
-            print("+ SUCCESS:", api)
+            print("| Fatal Error |",  str(result["bad_errors"][0]), "| |")
+    else:
+        for api in result:
+            if api != "bad_errors":
+                rescount = 0
+                okcount = 0
+                if True in result[api]:
+                    rescount += 1
+                    if result[api][True] == True:
+                        okcount += 1
+                if False in result[api]:
+                    rescount += 1
+                    if result[api][False] == True:
+                        okcount += 1
+                if rescount != okcount:
+                    if okcount == 0:
+                        print("|", api, "| **FAILURE** | |")
+                    else:
+                        if result[api][True]:
+                            print("|", api, "| **PARTIAL** | *Only* through condenser API |")
+                        else:
+                            print("|", api, "| **PARTIAL** | *Not* through condenser API |")
+
+                else:
+                    print("|", api, "| OK | |")
+    print()
 
 log.PythonLoggingObserver().start()
 logging.basicConfig(filename="test_nodes.log", level=logging.DEBUG)

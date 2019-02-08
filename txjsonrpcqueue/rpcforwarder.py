@@ -185,7 +185,8 @@ class RpcForwarder:
             newcmd["id"] = self.cmd_id
             newcmd["jsonrpc"] = "2.0"
             newcmd["method"] = cmd["method"]
-            newcmd["params"] = cmd["params"]
+            if cmd["params"]:
+                newcmd["params"] = cmd["params"]
             deferreds_map[self.cmd_id] = cmd["deferred"]
             batch_out.append(newcmd)
         #Piggybag extra command onto single command batches. FIXME: this is a temporary workaround.
@@ -194,7 +195,7 @@ class RpcForwarder:
             newcmd["id"] = 0
             newcmd["jsonrpc"] = "2.0"
             newcmd["method"] = "bogus_api.bogus_method"
-            newcmd["params"] = []
+            newcmd["params"] = ["Extra bogus API call for making sure the server supports batches of bigger than one."]
             batch_out.append(newcmd)
         #Post the JSON-RPC batch request to the server and wait for response
         log.msg("Posting batch to node " + self.host_url.decode("utf8"))
