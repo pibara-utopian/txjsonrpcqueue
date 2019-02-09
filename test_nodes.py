@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import operator
 import json
 import logging
 import time
@@ -39,14 +40,17 @@ class AppbaseTest(object):
         call.addCallbacks(ok_fun, fail_fun)
         call.addBoth(finaly_fun)
 
-class Node(object):
-    def __init__(self,url):
+class ApiNodeMonitor(object):
+    def __init__(self, url, callback, newurl):
         self.url=url
+        self.callback = callback
         self.appbase = txjsonrpcqueue.WildcardQueue(low=8000, high=10000, namespace="condenser_api")
         self.forwarder = txjsonrpcqueue.RpcForwarder(queue=self.appbase, host_url=url)
-    def test(self, callback):
+        self.tick()
+    def tick(self):
         def cbwrapper(rval, duration):
-            callback(self.url, rval, duration )
+            self.callback(self.url, rval, duration)
+            reactor.callLater(40, self.tick)
         abt = AppbaseTest(cbwrapper)
         abt.add_command(
             api="account_by_key", 
@@ -127,46 +131,88 @@ class Node(object):
             condenser=False,
             call=self.appbase.block_api.get_block(block_num=30000000))
 
-def print_result(url, result, duration):
-    print("# ", url)
-    print()
-    print("| | result | notes |")
-    print("| --- | --- |---")
-    dur = int(1000*duration)/1000
-    print("| Test Duration |", dur, "s | |")
-    if result["bad_errors"]:
-        if isinstance(result["bad_errors"][0], txjsonrpcqueue.exception.JsonRpcBatchError):
-            print("| Fatal Error |",  str(result["bad_errors"][0]), "|" + result["bad_errors"][0].body  + " |")
-        else:
-            print("| Fatal Error |",  str(result["bad_errors"][0]), "| |")
-    else:
-        for api in result:
-            if api != "bad_errors":
-                rescount = 0
-                okcount = 0
-                if True in result[api]:
-                    rescount += 1
-                    if result[api][True] == True:
-                        okcount += 1
-                if False in result[api]:
-                    rescount += 1
-                    if result[api][False] == True:
-                        okcount += 1
-                if rescount != okcount:
-                    if okcount == 0:
-                        print("|", api, "| **FAILURE** | |")
-                    else:
-                        if result[api][True]:
-                            print("|", api, "| **PARTIAL** | *Only* through condenser API |")
-                        else:
-                            print("|", api, "| **PARTIAL** | *Not* through condenser API |")
 
-                else:
-                    print("|", api, "| OK | |")
-    print()
+class CurentResults(object):
+    def __init__(self):
+        self.api = dict()
+        self.lastfail = dict()
+        self.lastupdate = dict()
+        self.speed_array = dict()
+        self.speed = dict()
+        for api in ["account_by_key", "account_history", "database", "follow", "jsonrpc", "market_history", "rc", "reputation", "tags", "block"]:
+            self.api[api] = set()
+    def process_node_results(self, url, result, duration):
+        now = time.time()
+        self.lastupdate[url] = now
+        if result["bad_errors"]:
+            print(url,result["bad_errors"][0])
+            self.lastfail[url] = now
+            if url in self.speed:
+                del self.speed[url]
+            for api in self.api.keys():
+                if "C" + url in self.api[api]:
+                    self.api[api].remove("C" + url)
+                if "N" + url in self.api[api]:
+                    self.api[api].remove("N" + url)
+                if "A" + url in self.api[api]:
+                    self.api[api].remove("A" + url)
+            self.speed_array[url] = list()
+        else:
+            if not url in self.speed_array:
+                self.speed_array[url] = list()
+            self.speed_array[url].append(duration)
+            self.speed_array[url] = self.speed_array[url][-10:]
+            tspeed = 0
+            for speed in self.speed_array[url]:
+                tspeed += speed
+            self.speed[url] = tspeed / len(self.speed_array[url])
+            for api in result:
+                if api != "bad_errors":
+                    cond_ok = False
+                    nsap_ok = False
+                    any_ok = False
+                    if True in result[api] and result[api][True]:
+                        cond_ok = True
+                    if False in result[api] and result[api][False]:
+                        nsap_ok = True
+                    if not True in result[api] and nsap_ok:
+                        cond_ok = True
+                    if not False in result[api] and cond_ok:
+                        nsap_ok = True
+                    if cond_ok or nsap_ok:
+                        any_ok = True
+                    if cond_ok:
+                        self.api[api].add("C" + url)
+                    if nsap_ok:
+                        self.api[api].add("N" + url)
+                    if any_ok:
+                        self.api[api].add("A" + url)
+        self.lookup(["block"], "A")
+    def lookup(self, api_list, prefix):
+        sets = list()
+        for api in api_list:
+            if api in self.api.keys():
+                sets.append(self.api[api])
+        if sets:
+            api_set = sets.pop(0)
+            for sn in sets:
+                api_set = api_set.intersection(sn)
+            results = list()
+            for api in api_set:
+                if api[0] == prefix:
+                    key = api[1:]
+                    val = self.speed[key]
+                    results.append([key, val])
+            results = [i[0] for i in sorted(results, key=operator.itemgetter(1))]
+            print(results)
+
+def new_url(url):
+    pass
 
 log.PythonLoggingObserver().start()
 logging.basicConfig(filename="test_nodes.log", level=logging.DEBUG)
+cr = CurentResults()
+
 
 nodes = ["https://steemd.minnowsupportproject.org",
          "https://rpc.usesteem.com",
@@ -182,7 +228,9 @@ nodes = ["https://steemd.minnowsupportproject.org",
          "https://api.steemitstage.com",
          "https://gtg.steem.house:8090"]
 for node in nodes:
-    n1 = Node(node)
-    n1.test(print_result)
+    n1 = ApiNodeMonitor(node, cr.process_node_results, new_url)
+
+
+
 
 reactor.run()
